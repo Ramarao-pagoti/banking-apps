@@ -1,61 +1,37 @@
-name: Accounts CI
+  update-manifest:
+    needs: build-scan-push
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'accounts-service/**'
-      - '.github/workflows/accounts-ci.yaml'
-
-permissions:
-  id-token: write
-  contents: read
-
-concurrency:
-  group: accounts-ci
-  cancel-in-progress: true
-
-env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
-  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
-  ECR_REPOSITORY: ${{ vars.ACCOUNTS_ECR_REPOSITORY }}
-
-jobs:
-  build-scan-push:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Source
+
+      - name: Checkout Platform Repo
         uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          repository: ${{ vars.PLATFORM_REPO }}
+          token: ${{ secrets.PLATFORM_REPO_TOKEN }}
+          path: platform-repo
 
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build Docker Image
+      - name: Update Image Tag
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build \
-            -t $ECR_REPOSITORY:${{ github.sha }} \
-            ./accounts-service
+          sed -i "s|image: .*|image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ACCOUNTS_ECR_REPOSITORY:$IMAGE_TAG|g" \
+          platform-repo/applications/accounts-service/deployment.yaml
 
-      - name: Run Trivy Scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-
-      - name: Tag Image
+      - name: Commit Changes
         run: |
-          docker tag \
-            $ECR_REPOSITORY:${{ github.sha }} \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          cd platform-repo
 
-      - name: Push Image
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add .
+
+          git diff --staged --quiet || \
+          git commit -m "Deploy accounts-service image ${{ github.sha }}"
+
+      - name: Push Changes
         run: |
-          docker push \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:${{ github.sha }}
+          cd platform-repo
+          git push
