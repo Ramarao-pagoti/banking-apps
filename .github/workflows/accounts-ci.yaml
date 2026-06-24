@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'accounts-service/**'
-      - '.github/workflows/accounts-ci.yml'
+      - '.github/workflows/accounts-ci.yaml'
 
 permissions:
   id-token: write
