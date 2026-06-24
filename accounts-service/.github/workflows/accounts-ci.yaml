@@ -49,7 +49,7 @@ jobs:
       - name: Tag Image
         run: |
           docker tag \
-            $EACCOUNTS_ECR_REPOSITORY:${{ github.sha }} \
+            $ACCOUNTS_ECR_REPOSITORY:${{ github.sha }} \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ACCOUNTS_ECR_REPOSITORY:${{ github.sha }}
 
       - name: Push Image
